@@ -83,6 +83,16 @@ mod az_event_registration {
 
             Ok(registration)
         }
+
+        #[ink(message)]
+        pub fn update(&mut self, referrer: Option<AccountId>) -> Result<Registration> {
+            let caller: AccountId = Self::env().caller();
+            let mut registration: Registration = self.show(caller)?;
+            registration.referrer = referrer;
+            self.registrations.insert(caller, &registration);
+
+            Ok(registration)
+        }
     }
 
     #[cfg(test)]
@@ -160,6 +170,50 @@ mod az_event_registration {
                 Err(AzEventRegistrationError::UnprocessableEntity(
                     "Registration already exists".to_string()
                 ))
+            );
+        }
+
+        #[ink::test]
+        fn test_update() {
+            let (accounts, mut az_event_registration) = init();
+            let mut referrer: Option<AccountId> = None;
+            // when registration does not exist
+            // * it raises an error
+            let mut result = az_event_registration.update(referrer);
+            assert_eq!(
+                result,
+                Err(AzEventRegistrationError::NotFound(
+                    "Registration".to_string()
+                ))
+            );
+            // when registration exists
+            result = az_event_registration.register(referrer);
+            result.unwrap();
+            // = when registrater does not have a reffer
+            // == when adding a new referrer
+            // == * it updates the referrer
+            referrer = Some(accounts.charlie);
+            result = az_event_registration.update(referrer);
+            let mut result_unwrapped = result.unwrap();
+            assert_eq!(
+                result_unwrapped,
+                Registration {
+                    address: accounts.bob,
+                    referrer
+                }
+            );
+            // = when registrater has a reffer
+            // == when removing the referrer
+            // == * it updates the referrer
+            referrer = None;
+            result = az_event_registration.update(referrer);
+            result_unwrapped = result.unwrap();
+            assert_eq!(
+                result_unwrapped,
+                Registration {
+                    address: accounts.bob,
+                    referrer
+                }
             );
         }
     }
