@@ -80,6 +80,12 @@ mod az_event_registration {
         #[ink(message)]
         pub fn register(&mut self, referrer: Option<AccountId>) -> Result<Registration> {
             let caller: AccountId = Self::env().caller();
+            let block_timestamp: Timestamp = Self::env().block_timestamp();
+            if block_timestamp > self.deadline {
+                return Err(AzEventRegistrationError::UnprocessableEntity(
+                    "Registration is now closed".to_string(),
+                ));
+            }
             if let Some(referrer_unwrapped) = referrer {
                 if referrer_unwrapped == caller {
                     return Err(AzEventRegistrationError::UnprocessableEntity(
@@ -173,12 +179,27 @@ mod az_event_registration {
         #[ink::test]
         fn test_register() {
             let (accounts, mut az_event_registration) = init();
-            // when registration does not exist
-            // = when referrer is present
-            // == when referrer is different to caller
-            // === * it create a new registration
             let mut referrer: Option<AccountId> = Some(accounts.alice);
+            // when current block timestamp is greater than deadline
+            ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(
+                az_event_registration.deadline + 1,
+            );
             let mut result = az_event_registration.register(referrer);
+            assert_eq!(
+                result,
+                Err(AzEventRegistrationError::UnprocessableEntity(
+                    "Registration is now closed".to_string()
+                ))
+            );
+            // when current block timestamp is less than or equal to deadline
+            ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(
+                az_event_registration.deadline,
+            );
+            // = when registration does not exist
+            // == when referrer is present
+            // === when referrer is different to caller
+            // ==== * it create a new registration
+            result = az_event_registration.register(referrer);
             let mut result_unwrapped = result.unwrap();
             assert_eq!(
                 result_unwrapped,
@@ -187,9 +208,9 @@ mod az_event_registration {
                     referrer
                 }
             );
-            // == when referrer is same as caller
+            // === when referrer is same as caller
             referrer = Some(accounts.bob);
-            // === * it raises an error
+            // ==== * it raises an error
             result = az_event_registration.register(referrer);
             assert_eq!(
                 result,
@@ -197,9 +218,9 @@ mod az_event_registration {
                     "Registrant and referrer must be different".to_string()
                 ))
             );
-            // = when referrer is blank
+            // == when referrer is blank
             referrer = None;
-            // = * it create a new registration
+            // == * it create a new registration
             set_caller::<DefaultEnvironment>(accounts.charlie);
             result = az_event_registration.register(referrer);
             result_unwrapped = result.unwrap();
@@ -210,8 +231,8 @@ mod az_event_registration {
                     referrer
                 }
             );
-            // when registration exists
-            // * it raises an error
+            // = when registration exists
+            // = * it raises an error
             result = az_event_registration.register(referrer);
             assert_eq!(
                 result,
