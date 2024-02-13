@@ -5,7 +5,9 @@ mod errors;
 #[ink::contract]
 mod az_event_registration {
     use crate::errors::AzEventRegistrationError;
-    use ink::{codegen::EmitEvent, reflect::ContractEventBase, storage::Mapping};
+    use ink::{
+        codegen::EmitEvent, prelude::string::ToString, reflect::ContractEventBase, storage::Mapping,
+    };
 
     // === TYPES ===
     type Event = <AzEventRegistration as ContractEventBase>::Type;
