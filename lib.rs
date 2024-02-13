@@ -5,11 +5,20 @@ mod errors;
 #[ink::contract]
 mod az_event_registration {
     use crate::errors::AzEventRegistrationError;
-    use ink::{reflect::ContractEventBase, storage::Mapping};
+    use ink::{codegen::EmitEvent, reflect::ContractEventBase, storage::Mapping};
 
     // === TYPES ===
     type Event = <AzEventRegistration as ContractEventBase>::Type;
     type Result<T> = core::result::Result<T, AzEventRegistrationError>;
+
+    // === EVENTS ===
+    #[ink(event)]
+    pub struct Register {
+        #[ink(topic)]
+        address: AccountId,
+        #[ink(topic)]
+        referrer: Option<AccountId>,
+    }
 
     // === STRUCTS ===
     #[derive(Debug, Clone, scale::Encode, scale::Decode)]
@@ -105,6 +114,14 @@ mod az_event_registration {
             };
             self.registrations.insert(caller, &registration);
 
+            Self::emit_event(
+                self.env(),
+                Event::Register(Register {
+                    address: caller,
+                    referrer,
+                }),
+            );
+
             Ok(registration)
         }
 
@@ -134,6 +151,10 @@ mod az_event_registration {
             }
 
             Ok(())
+        }
+
+        fn emit_event<EE: EmitEvent<Self>>(emitter: EE, event: Event) {
+            emitter.emit_event(event);
         }
     }
 
