@@ -13,6 +13,12 @@ mod az_event_registration {
 
     // === EVENTS ===
     #[ink(event)]
+    pub struct Destroy {
+        #[ink(topic)]
+        address: AccountId,
+    }
+
+    #[ink(event)]
     pub struct Register {
         #[ink(topic)]
         address: AccountId,
@@ -90,6 +96,8 @@ mod az_event_registration {
             self.show(caller)?;
 
             self.registrations.remove(caller);
+
+            Self::emit_event(self.env(), Event::Destroy(Destroy { address: caller }));
 
             Ok(())
         }
