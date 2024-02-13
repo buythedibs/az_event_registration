@@ -16,6 +16,7 @@ mod az_event_registration {
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub struct Config {
         admin: AccountId,
+        deadline: Timestamp,
     }
 
     #[derive(scale::Decode, scale::Encode, Debug, Clone, PartialEq)]
@@ -32,21 +33,28 @@ mod az_event_registration {
     #[ink(storage)]
     pub struct AzEventRegistration {
         admin: AccountId,
+        deadline: Timestamp,
         registrations: Mapping<AccountId, Registration>,
     }
     impl AzEventRegistration {
         #[ink(constructor)]
-        pub fn new() -> Self {
+        pub fn new(deadline: Timestamp) -> Self {
             Self {
                 admin: Self::env().caller(),
+                deadline,
                 registrations: Mapping::default(),
             }
         }
 
         // === QUERIES ===
+        // deadline is u64
+        // Javascript works with this number new Date(1707789561000)
         #[ink(message)]
         pub fn config(&self) -> Config {
-            Config { admin: self.admin }
+            Config {
+                admin: self.admin,
+                deadline: self.deadline,
+            }
         }
 
         #[ink(message)]
@@ -113,11 +121,13 @@ mod az_event_registration {
             DefaultEnvironment,
         };
 
+        const MOCK_DEAD_LINE: Timestamp = 654654;
+
         // === HELPERS ===
         fn init() -> (DefaultAccounts<DefaultEnvironment>, AzEventRegistration) {
             let accounts = default_accounts();
             set_caller::<DefaultEnvironment>(accounts.bob);
-            let az_event_registration = AzEventRegistration::new();
+            let az_event_registration = AzEventRegistration::new(MOCK_DEAD_LINE);
             (accounts, az_event_registration)
         }
 
@@ -129,6 +139,7 @@ mod az_event_registration {
             let config = az_event_registration.config();
             // * it returns the config
             assert_eq!(config.admin, accounts.bob);
+            assert_eq!(config.deadline, MOCK_DEAD_LINE)
         }
 
         // === TEST HANDLES ===
