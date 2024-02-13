@@ -117,6 +117,24 @@ mod az_event_registration {
 
             Ok(registration)
         }
+
+        #[ink(message)]
+        pub fn update_config(&mut self, deadline: Timestamp) -> Result<()> {
+            let caller: AccountId = Self::env().caller();
+            Self::authorise(caller, self.admin)?;
+
+            self.deadline = deadline;
+
+            Ok(())
+        }
+
+        fn authorise(allowed: AccountId, received: AccountId) -> Result<()> {
+            if allowed != received {
+                return Err(AzEventRegistrationError::Unauthorised);
+            }
+
+            Ok(())
+        }
     }
 
     #[cfg(test)]
@@ -284,6 +302,22 @@ mod az_event_registration {
                     referrer
                 }
             );
+        }
+
+        #[ink::test]
+        fn test_update_config() {
+            let (accounts, mut az_event_registration) = init();
+            let new_deadline: Timestamp = 123456789;
+            // when called by non-admin
+            set_caller::<DefaultEnvironment>(accounts.charlie);
+            // * it raises an error
+            let result = az_event_registration.update_config(new_deadline);
+            assert_eq!(result, Err(AzEventRegistrationError::Unauthorised));
+            // when called by admin
+            set_caller::<DefaultEnvironment>(accounts.bob);
+            // * it updates the config
+            az_event_registration.update_config(new_deadline).unwrap();
+            assert_eq!(az_event_registration.deadline, new_deadline);
         }
     }
 }
