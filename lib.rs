@@ -20,6 +20,14 @@ mod az_event_registration {
         referrer: Option<AccountId>,
     }
 
+    #[ink(event)]
+    pub struct Update {
+        #[ink(topic)]
+        address: AccountId,
+        #[ink(topic)]
+        referrer: Option<AccountId>,
+    }
+
     // === STRUCTS ===
     #[derive(Debug, Clone, scale::Encode, scale::Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
@@ -131,6 +139,14 @@ mod az_event_registration {
             let mut registration: Registration = self.show(caller)?;
             registration.referrer = referrer;
             self.registrations.insert(caller, &registration);
+
+            Self::emit_event(
+                self.env(),
+                Event::Update(Update {
+                    address: caller,
+                    referrer,
+                }),
+            );
 
             Ok(registration)
         }
