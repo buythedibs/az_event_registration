@@ -60,6 +60,16 @@ mod az_event_registration {
 
         // === HANDLES ===
         #[ink(message)]
+        pub fn destroy(&mut self) -> Result<()> {
+            let caller: AccountId = Self::env().caller();
+            self.show(caller)?;
+
+            self.registrations.remove(caller);
+
+            Ok(())
+        }
+
+        #[ink(message)]
         pub fn register(&mut self, referrer: Option<AccountId>) -> Result<Registration> {
             let caller: AccountId = Self::env().caller();
             if let Some(referrer_unwrapped) = referrer {
@@ -122,6 +132,33 @@ mod az_event_registration {
         }
 
         // === TEST HANDLES ===
+        #[ink::test]
+        fn test_destroy() {
+            let (accounts, mut az_event_registration) = init();
+            let referrer: Option<AccountId> = None;
+            // when registration does not exist
+            // * it raises an error
+            let mut result = az_event_registration.update(referrer);
+            assert_eq!(
+                result,
+                Err(AzEventRegistrationError::NotFound(
+                    "Registration".to_string()
+                ))
+            );
+            // when registration exists
+            result = az_event_registration.register(referrer);
+            result.unwrap();
+            // * it destroys the registration
+            az_event_registration.destroy().unwrap();
+            result = az_event_registration.show(accounts.bob);
+            assert_eq!(
+                result,
+                Err(AzEventRegistrationError::NotFound(
+                    "Registration".to_string()
+                ))
+            );
+        }
+
         #[ink::test]
         fn test_register() {
             let (accounts, mut az_event_registration) = init();
