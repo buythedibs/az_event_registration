@@ -94,6 +94,7 @@ mod az_event_registration {
         // === HANDLES ===
         #[ink(message)]
         pub fn destroy(&mut self) -> Result<()> {
+            self.registration_open()?;
             let caller: AccountId = Self::env().caller();
             self.show(caller)?;
 
@@ -106,13 +107,8 @@ mod az_event_registration {
 
         #[ink(message)]
         pub fn register(&mut self, referrer: Option<AccountId>) -> Result<Registration> {
+            self.registration_open()?;
             let caller: AccountId = Self::env().caller();
-            let block_timestamp: Timestamp = Self::env().block_timestamp();
-            if block_timestamp > self.deadline {
-                return Err(AzEventRegistrationError::UnprocessableEntity(
-                    "Registration is now closed".to_string(),
-                ));
-            }
             if let Some(referrer_unwrapped) = referrer {
                 if referrer_unwrapped == caller {
                     return Err(AzEventRegistrationError::UnprocessableEntity(
@@ -145,6 +141,7 @@ mod az_event_registration {
 
         #[ink(message)]
         pub fn update(&mut self, referrer: Option<AccountId>) -> Result<Registration> {
+            self.registration_open()?;
             let caller: AccountId = Self::env().caller();
             let mut registration: Registration = self.show(caller)?;
             registration.referrer = referrer;
@@ -174,6 +171,17 @@ mod az_event_registration {
         fn authorise(allowed: AccountId, received: AccountId) -> Result<()> {
             if allowed != received {
                 return Err(AzEventRegistrationError::Unauthorised);
+            }
+
+            Ok(())
+        }
+
+        fn registration_open(&self) -> Result<()> {
+            let block_timestamp: Timestamp = Self::env().block_timestamp();
+            if block_timestamp > self.deadline {
+                return Err(AzEventRegistrationError::UnprocessableEntity(
+                    "Registration is now closed".to_string(),
+                ));
             }
 
             Ok(())
@@ -218,19 +226,34 @@ mod az_event_registration {
         fn test_destroy() {
             let (accounts, mut az_event_registration) = init();
             let referrer: Option<AccountId> = None;
-            // when registration does not exist
-            // * it raises an error
-            let mut result = az_event_registration.update(referrer);
+            // when current block timestamp is greater than deadline
+            ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(
+                az_event_registration.deadline + 1,
+            );
+            let mut result = az_event_registration.destroy();
+            assert_eq!(
+                result,
+                Err(AzEventRegistrationError::UnprocessableEntity(
+                    "Registration is now closed".to_string()
+                ))
+            );
+            // when current block timestamp is less than or equal to deadline
+            ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(
+                az_event_registration.deadline,
+            );
+            // = when registration does not exist
+            // = * it raises an error
+            result = az_event_registration.destroy();
             assert_eq!(
                 result,
                 Err(AzEventRegistrationError::NotFound(
                     "Registration".to_string()
                 ))
             );
-            // when registration exists
-            result = az_event_registration.register(referrer);
+            // = when registration exists
+            let mut result = az_event_registration.register(referrer);
             result.unwrap();
-            // * it destroys the registration
+            // = * it destroys the registration
             az_event_registration.destroy().unwrap();
             result = az_event_registration.show(accounts.bob);
             assert_eq!(
@@ -250,6 +273,21 @@ mod az_event_registration {
                 az_event_registration.deadline + 1,
             );
             let mut result = az_event_registration.register(referrer);
+            assert_eq!(
+                result,
+                Err(AzEventRegistrationError::UnprocessableEntity(
+                    "Registration is now closed".to_string()
+                ))
+            );
+            // when current block timestamp is less than or equal to deadline
+            ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(
+                az_event_registration.deadline,
+            );
+            // when current block timestamp is greater than deadline
+            ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(
+                az_event_registration.deadline + 1,
+            );
+            result = az_event_registration.register(referrer);
             assert_eq!(
                 result,
                 Err(AzEventRegistrationError::UnprocessableEntity(
@@ -311,21 +349,36 @@ mod az_event_registration {
         fn test_update() {
             let (accounts, mut az_event_registration) = init();
             let mut referrer: Option<AccountId> = None;
-            // when registration does not exist
-            // * it raises an error
+            // when current block timestamp is greater than deadline
+            ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(
+                az_event_registration.deadline + 1,
+            );
             let mut result = az_event_registration.update(referrer);
+            assert_eq!(
+                result,
+                Err(AzEventRegistrationError::UnprocessableEntity(
+                    "Registration is now closed".to_string()
+                ))
+            );
+            // when current block timestamp is less than or equal to deadline
+            ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(
+                az_event_registration.deadline,
+            );
+            // = when registration does not exist
+            // = * it raises an error
+            result = az_event_registration.update(referrer);
             assert_eq!(
                 result,
                 Err(AzEventRegistrationError::NotFound(
                     "Registration".to_string()
                 ))
             );
-            // when registration exists
+            // = when registration exists
             result = az_event_registration.register(referrer);
             result.unwrap();
-            // = when registrater does not have a reffer
-            // == when adding a new referrer
-            // == * it updates the referrer
+            // == when registrater does not have a reffer
+            // === when adding a new referrer
+            // === * it updates the referrer
             referrer = Some(accounts.charlie);
             result = az_event_registration.update(referrer);
             let mut result_unwrapped = result.unwrap();
@@ -336,9 +389,9 @@ mod az_event_registration {
                     referrer
                 }
             );
-            // = when registrater has a reffer
-            // == when removing the referrer
-            // == * it updates the referrer
+            // == when registrater has a reffer
+            // === when removing the referrer
+            // === * it updates the referrer
             referrer = None;
             result = az_event_registration.update(referrer);
             result_unwrapped = result.unwrap();
