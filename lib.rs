@@ -108,14 +108,8 @@ mod az_event_registration {
         #[ink(message)]
         pub fn register(&mut self, referrer: Option<AccountId>) -> Result<Registration> {
             self.registration_open()?;
+            self.registrant_and_referrer_different(referrer)?;
             let caller: AccountId = Self::env().caller();
-            if let Some(referrer_unwrapped) = referrer {
-                if referrer_unwrapped == caller {
-                    return Err(AzEventRegistrationError::UnprocessableEntity(
-                        "Registrant and referrer must be different".to_string(),
-                    ));
-                }
-            }
             if self.registrations.get(caller).is_some() {
                 return Err(AzEventRegistrationError::UnprocessableEntity(
                     "Registration already exists".to_string(),
@@ -142,6 +136,7 @@ mod az_event_registration {
         #[ink(message)]
         pub fn update(&mut self, referrer: Option<AccountId>) -> Result<Registration> {
             self.registration_open()?;
+            self.registrant_and_referrer_different(referrer)?;
             let caller: AccountId = Self::env().caller();
             let mut registration: Registration = self.show(caller)?;
             registration.referrer = referrer;
@@ -171,6 +166,19 @@ mod az_event_registration {
         fn authorise(allowed: AccountId, received: AccountId) -> Result<()> {
             if allowed != received {
                 return Err(AzEventRegistrationError::Unauthorised);
+            }
+
+            Ok(())
+        }
+
+        fn registrant_and_referrer_different(&self, referrer: Option<AccountId>) -> Result<()> {
+            let caller: AccountId = Self::env().caller();
+            if let Some(referrer_unwrapped) = referrer {
+                if referrer_unwrapped == caller {
+                    return Err(AzEventRegistrationError::UnprocessableEntity(
+                        "Registrant and referrer must be different".to_string(),
+                    ));
+                }
             }
 
             Ok(())
@@ -376,8 +384,9 @@ mod az_event_registration {
             // = when registration exists
             result = az_event_registration.register(referrer);
             result.unwrap();
-            // == when registrater does not have a reffer
+            // == when registrater does not have a referrer
             // === when adding a new referrer
+            // === when referrer is different to caller
             // === * it updates the referrer
             referrer = Some(accounts.charlie);
             result = az_event_registration.update(referrer);
@@ -389,7 +398,17 @@ mod az_event_registration {
                     referrer
                 }
             );
-            // == when registrater has a reffer
+            // === when referrer is the same as caller
+            referrer = Some(accounts.bob);
+            // === * it raises an error
+            result = az_event_registration.update(referrer);
+            assert_eq!(
+                result,
+                Err(AzEventRegistrationError::UnprocessableEntity(
+                    "Registrant and referrer must be different".to_string()
+                ))
+            );
+            // == when registrater has a referrer
             // === when removing the referrer
             // === * it updates the referrer
             referrer = None;
