@@ -2,6 +2,10 @@
 
 Smart contract for users to register for events. It will be used to keep a track of user's that want to participate in the $DIBS airdrop. User's will be able to register and also add a referrer.
 
+### Design Notes
+
+I've decided not to store personal details about the user in this registration as that would be bad for privacy. I did consider encrypting first, but there's still a risk there that seems wrong and unnecessary.
+
 ## Getting Started
 ### Prerequisites
 
